@@ -1,0 +1,5 @@
+rootProject.name = 'front-and-app'
+
+include 'common'
+include 'front-end'
+include 'app-srv'
