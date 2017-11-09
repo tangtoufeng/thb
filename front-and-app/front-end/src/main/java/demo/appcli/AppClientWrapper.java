@@ -3,6 +3,7 @@ package demo.appcli;
 import demo.common.CommonThreadFactory;
 import demo.common.DefaultConfig;
 import demo.common.SnowflakeIdWorker;
+import demo.common.ThroughputChecker;
 import io.netty.channel.ChannelHandlerContext;
 
 import java.util.Map;
@@ -17,14 +18,15 @@ public class AppClientWrapper {
     private static final int TRY_TIMES = 3;
     private static final AppClientWrapper CLIENT = new AppClientWrapper();
 
-    private AtomicBoolean active = new AtomicBoolean(true);
+    private AtomicBoolean active = new AtomicBoolean(false);
     private int size = CONFIG.getIntByKey(APP_CLI_POOL_SIZE);
     private int workerId = CONFIG.getIntByKey(APP_CLI_WORK_ID);
     private int dataCenterId = CONFIG.getIntByKey(APP_CLI_DATA_CENTER_ID);
     private ExecutorService pool;
     private BlockingQueue<Object[]> queue = new ArrayBlockingQueue<>(CONFIG.getIntByKey(APP_CLI_QUEUE_SIZE));
     private SnowflakeIdWorker idWorker;
-
+	private static final byte[] LOCK = new byte[0];
+    
     public static AppClientWrapper getClient() {
         return CLIENT;
     }
@@ -42,24 +44,38 @@ public class AppClientWrapper {
     }
 
     public void startLoop() {
-        idWorker = new SnowflakeIdWorker(workerId, dataCenterId);
-        pool = Executors.newFixedThreadPool(size, new CommonThreadFactory("AppClient"));
-        AppClient.init();
-        for (int i = 0; i < size; i++) {
-            pool.submit(new PostRunnable(active, queue, idWorker));
-        }
+    	synchronized (LOCK) {
+    		if(!active.get()){
+    			active.set(true);
+    			idWorker = new SnowflakeIdWorker(workerId, dataCenterId);
+    	        pool = Executors.newFixedThreadPool(size, new CommonThreadFactory("AppClient"));
+    	        AppClient.init();
+    	        for (int i = 0; i < size; i++) {
+    	            pool.submit(new PostRunnable(active, queue, idWorker));
+    	        }
+    	        ThroughputChecker.getThroughputChecker().load();
+    		}
+		   
+		}
+     
     }
 
     public void stopLoop() {
-        active.set(false);
-        if (pool != null) {
-            try {
-                pool.awaitTermination(CONFIG.getIntByKey(APP_CLI_POOL_QUIT_TIMEOUT), TimeUnit.MILLISECONDS);
-            } catch (InterruptedException e) {
-                //
-            }
-        }
-        AppClient.destroy();
+    	synchronized (LOCK) {
+    		if(active.get()){
+			  active.set(false);
+    	      if (pool != null) {
+    	            try {
+    	                pool.awaitTermination(CONFIG.getIntByKey(APP_CLI_POOL_QUIT_TIMEOUT), TimeUnit.MILLISECONDS);
+    	            } catch (InterruptedException e) {
+    	                //
+    	            }
+    	        }
+    	        AppClient.destroy();
+    		}
+    	}
+
+      
     }
 
 }

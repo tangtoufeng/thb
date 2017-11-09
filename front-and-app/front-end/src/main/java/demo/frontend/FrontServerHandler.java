@@ -2,6 +2,7 @@ package demo.frontend;
 
 import demo.appcli.AppClientWrapper;
 import demo.common.HttpResponseHelper;
+import demo.common.ThroughputChecker;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -19,14 +20,22 @@ import java.util.Map;
 public class FrontServerHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
 
     private HttpDataFactory factory = new DefaultHttpDataFactory(false);
-
+    
+    private String appType;
+    /**
+	 * 
+	 */
+	public FrontServerHandler(String appType) {
+		this.appType = appType;
+	}
     @Override
     public void channelRead0(ChannelHandlerContext ctx, FullHttpRequest request) {
+    	System.out.println(appType+"appTypeappTypeappType");
         HttpMethod method = request.method();
         if (HttpMethod.POST.equals(method)) {
             Map<String, String> param = parseHttp(request);
-            if (!AppClientWrapper.getClient().putHttpReq(ctx, param)) {
-                HttpResponseHelper.responseTooMany(ctx, "server is full, request later");
+            if (!ThroughputChecker.getThroughputChecker().check(ThroughputChecker.ALL_TPS_LIMIT_URL)||!AppClientWrapper.getClient().putHttpReq(ctx, param)) {
+            	HttpResponseHelper.responseTooMany(ctx, "server is full, request later");
             }
         } else {
             HttpResponseHelper.responseForbidden(ctx, "not POST method");
@@ -57,4 +66,11 @@ public class FrontServerHandler extends SimpleChannelInboundHandler<FullHttpRequ
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         HttpResponseHelper.responseInnerSrvError(ctx, "server error!");
     }
+	/**
+	 * @return the appType
+	 */
+	public String getAppType() {
+		return appType;
+	}
+    
 }

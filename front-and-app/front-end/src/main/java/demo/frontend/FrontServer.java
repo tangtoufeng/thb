@@ -14,10 +14,10 @@ public class FrontServer {
     public FrontServer() {
     }
 
-    public void serve() {
+    public void serve(int port) {
         AppClientWrapper wrapper = AppClientWrapper.getClient();
         wrapper.startLoop();
-        final FrontServerHandler handler = new FrontServerHandler();
+        final FrontServerHandler handler = new FrontServerHandler(port+"");
         // Configure the server.
         EventLoopGroup bossGroup =
                 OSDetect.chooseEventLoopGroup(CONFIG.getIntByKey(FRONT_END_BOSS_GROUP_SIZE));
@@ -31,7 +31,7 @@ public class FrontServer {
                     .childHandler(new FrontServerInitializer(handler));
 
             // Start the server.
-            ChannelFuture f = b.bind(CONFIG.getIntByKey(FRONT_END_PORT)).sync();
+            ChannelFuture f = b.bind(port).sync();
 
             // Wait until the server socket is closed.
             f.channel().closeFuture().sync();
